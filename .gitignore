@@ -1,0 +1,43 @@
+# Unity-generated directories
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+
+# IDE and editor files
+.vs/
+.vscode/
+.idea/
+*.csproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Unity-generated metadata/debug files
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+sysinfo.txt
+
+# Crash reports and OS files
+crashlytics-build.properties
+*.stackdump
+.DS_Store
+Thumbs.db
+
+# Local recorded output (remove this rule if it is source data)
+RecordedData/
