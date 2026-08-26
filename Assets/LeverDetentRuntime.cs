@@ -15,11 +15,23 @@ public sealed class LeverRotorTorqueTest : MonoBehaviour
     [SerializeField, Min(0f)] float torque = 1f;
     [SerializeField, Min(0.01f), Tooltip("Time to reach maximum input torque [s]")]
     float torqueRampSeconds = 3f;
+    [SerializeField, Min(0.01f), Tooltip("Time for input torque to decay to zero after releasing the arrow key [s]")]
+    float torqueReleaseSeconds = 1f;
     [SerializeField, Tooltip("Current ramped input torque [N m]")]
     float currentAppliedTorque;
     [SerializeField, Min(0f), Tooltip("Viscous resistance coefficient: torque = -coefficient * angular velocity [N m s/rad]")]
     float rotationalResistanceCoefficient = 0.3f;
-    [SerializeField, Tooltip("Current resistance torque around the rotation axis [N m]")]
+    [SerializeField, Min(0f), Tooltip("Additional viscous damping applied only while a gear tooth touches the plunger [N m s/rad]")]
+    float contactDampingCoefficient = 1f;
+    [SerializeField, Range(0.1f, 30f), Tooltip("Half-width of the tooth alignment region where contact damping is active [degrees]")]
+    float contactDampingApproachAngleDegrees = 10f;
+    [SerializeField, Range(0f, 1f), Tooltip("Current damping strength from tooth alignment")]
+    float currentContactDampingStrength;
+    [SerializeField, Tooltip("Current angle-based contact damping coefficient [N m s/rad]")]
+    float currentContactDampingCoefficient;
+    [SerializeField, Tooltip("Current contact damping torque around the rotation axis [N m]")]
+    float currentContactDampingTorque;
+    [SerializeField, Tooltip("Current total resistance torque around the rotation axis [N m]")]
     float currentResistanceTorque;
     [SerializeField, Tooltip("Record one CSV row per physics step for Python/Excel training data")]
     bool recordTrainingData = true;
@@ -67,6 +79,11 @@ public sealed class LeverRotorTorqueTest : MonoBehaviour
 
     public bool AngleSetMode => angleSetMode;
     public float TargetAngleRadians => targetAngleRadians;
+    public float CurrentContactDampingStrength => currentContactDampingStrength;
+    public float CurrentContactDampingCoefficient => currentContactDampingCoefficient;
+    public float CurrentContactDampingTorque => currentContactDampingTorque;
+    public bool IsContactDampingEngaged => currentContactDampingCoefficient > 0.0001f;
+    public bool IsContactDampingActing => Mathf.Abs(currentContactDampingTorque) > 0.000001f;
 
     void Awake()
     {
@@ -157,14 +174,30 @@ public sealed class LeverRotorTorqueTest : MonoBehaviour
         angularMomentumKgM2S = hingeInertiaKgM2 * axisSpeed;
         CalculateStateEnergies();
 
-        currentResistanceTorque = -rotationalResistanceCoefficient * axisSpeed;
+        float approachStrength = detentPlunger
+            ? detentPlunger.CalculateToothAlignment01(contactDampingApproachAngleDegrees, worldAxis)
+            : 0f;
+        currentContactDampingStrength = approachStrength;
+        float targetContactDamping = contactDampingCoefficient * currentContactDampingStrength;
+        currentContactDampingCoefficient = targetContactDamping;
+        // currentContactDampingTorque = -currentContactDampingCoefficient * axisSpeed;
+        currentContactDampingTorque = 0f; // Damper disabled for comparison.
+        currentResistanceTorque =
+            -rotationalResistanceCoefficient * axisSpeed;
+            // + currentContactDampingTorque; // Enable to apply the angle-dependent damper again.
         body.AddTorque(worldAxis * ToPhysicalSign(currentResistanceTorque), ForceMode.Force);
         float signedInputTorque = 0f;
 
         if (direction == 0f)
         {
-            currentAppliedTorque = 0f;
-            previousDirection = 0f;
+            currentAppliedTorque = Mathf.MoveTowards(
+                currentAppliedTorque,
+                0f,
+                torque / torqueReleaseSeconds * Time.fixedDeltaTime);
+
+            signedInputTorque = currentAppliedTorque * previousDirection;
+            if (currentAppliedTorque <= 0f)
+                previousDirection = 0f;
         }
         else
         {
@@ -178,8 +211,10 @@ public sealed class LeverRotorTorqueTest : MonoBehaviour
             previousDirection = direction;
 
             signedInputTorque = currentAppliedTorque * direction;
-            body.AddTorque(worldAxis * ToPhysicalSign(signedInputTorque), ForceMode.Force);
         }
+
+        if (signedInputTorque != 0f)
+            body.AddTorque(worldAxis * ToPhysicalSign(signedInputTorque), ForceMode.Force);
 
         WriteCsvRow(axisSpeed, angularAcceleration, signedInputTorque);
         previousAxisSpeed = axisSpeed;

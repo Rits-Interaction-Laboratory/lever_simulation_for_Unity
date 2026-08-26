@@ -154,7 +154,7 @@ internal static class LeverDetentSceneSetup
             float angle = i * 360f / toothCount;
             float radians = angle * Mathf.Deg2Rad;
             var tooth = NewChild(colliders.transform, $"ToothCollider_{i:00}");
-            tooth.SetActive(i != 8 && i != 9);
+            tooth.SetActive(i != 1 && i != 2 && i != 3 && i != 4 && i != 8 && i != 9);
             tooth.transform.localPosition = new Vector3(Mathf.Cos(radians), Mathf.Sin(radians), 0f) * (outerRadius - radialDepth * 0.5f);
             tooth.transform.localRotation = Quaternion.Euler(0f, 0f, angle);
             var box = Add<BoxCollider>(tooth);
@@ -296,6 +296,9 @@ internal static class LeverDetentSceneSetup
             var serialized = new SerializedObject(torqueTest);
             serialized.FindProperty("torque").floatValue = 1f;
             serialized.FindProperty("torqueRampSeconds").floatValue = 3f;
+            serialized.FindProperty("torqueReleaseSeconds").floatValue = 1f;
+            serialized.FindProperty("contactDampingCoefficient").floatValue = 1f;
+            serialized.FindProperty("contactDampingApproachAngleDegrees").floatValue = 10f;
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(torqueTest);
         }
@@ -329,7 +332,7 @@ internal static class LeverDetentSceneSetup
         {
             var tooth = gearColliders.Find($"ToothCollider_{i:00}");
             if (!tooth) continue;
-            tooth.gameObject.SetActive(i != 8 && i != 9);
+            tooth.gameObject.SetActive(i != 1 && i != 2 && i != 3 && i != 4 && i != 8 && i != 9);
             float angle = i * 360f / toothCount + halfToothOffset;
             float radians = angle * Mathf.Deg2Rad;
             tooth.localPosition = new Vector3(Mathf.Cos(radians), Mathf.Sin(radians), 0f) * toothCenterRadius;

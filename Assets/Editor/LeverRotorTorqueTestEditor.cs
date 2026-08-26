@@ -16,6 +16,10 @@ public sealed class LeverRotorTorqueTestEditor : Editor
     public override void OnInspectorGUI()
     {
         serializedObject.Update();
+        var lever = (LeverRotorTorqueTest)target;
+
+        DrawContactDamperStatus(lever);
+        EditorGUILayout.Space();
         DrawPropertiesExcluding(serializedObject, "m_Script", "angleSetMode", "targetAngleRadians");
 
         EditorGUILayout.Space();
@@ -31,7 +35,6 @@ public sealed class LeverRotorTorqueTestEditor : Editor
             "The controls below only operate in Play mode, so the test pose is not saved to the scene.",
             MessageType.Info);
 
-        var lever = (LeverRotorTorqueTest)target;
         if (settingsChanged && Application.isPlaying)
             lever.SetAngleMode(angleSetMode.boolValue, targetAngleRadians.floatValue);
 
@@ -62,5 +65,43 @@ public sealed class LeverRotorTorqueTestEditor : Editor
 
         if (Application.isPlaying)
             Repaint();
+    }
+
+    static void DrawContactDamperStatus(LeverRotorTorqueTest lever)
+    {
+        EditorGUILayout.LabelField("Contact Damper Status", EditorStyles.boldLabel);
+
+        string status;
+        MessageType messageType;
+        if (!Application.isPlaying)
+        {
+            status = "NOT RUNNING - Enter Play mode to monitor the damper.";
+            messageType = MessageType.None;
+        }
+        else if (lever.IsContactDampingActing)
+        {
+            status = "ACTIVE - The contact damper is applying torque.";
+            messageType = MessageType.Info;
+        }
+        else if (lever.IsContactDampingEngaged)
+        {
+            status = "ENGAGED - Damping is ready, but the lever is not moving.";
+            messageType = MessageType.Warning;
+        }
+        else
+        {
+            status = "INACTIVE - The contact damper is not engaged.";
+            messageType = MessageType.None;
+        }
+
+        EditorGUILayout.HelpBox(status, messageType);
+        using (new EditorGUI.DisabledScope(true))
+        {
+            EditorGUILayout.Toggle("Applying Damping Torque", lever.IsContactDampingActing);
+            EditorGUILayout.Slider("Contact Strength", lever.CurrentContactDampingStrength, 0f, 1f);
+            EditorGUILayout.FloatField(
+                "Current Coefficient [N m s/rad]", lever.CurrentContactDampingCoefficient);
+            EditorGUILayout.FloatField("Current Torque [N m]", lever.CurrentContactDampingTorque);
+        }
     }
 }

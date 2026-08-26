@@ -8,8 +8,8 @@ public sealed class DetentPlungerDebug : MonoBehaviour
     bool enableGearContact = true;
     [SerializeField] Vector3 initialLocalPosition;
     [SerializeField] float positionSpring = 300000f;
-    [SerializeField] float positionDamper = 450f;
-    [SerializeField] float maximumSpringForce = 1000f;
+    [SerializeField] float positionDamper = 30f;
+    [SerializeField] float maximumSpringForce = 50f;
     [SerializeField, Tooltip("Current downward displacement [m]")]
     float currentCompressionMeters;
     [SerializeField, Tooltip("Position Spring x compression [N]")]
@@ -38,6 +38,9 @@ public sealed class DetentPlungerDebug : MonoBehaviour
 
     Rigidbody body;
     ConfigurableJoint configurableJoint;
+    SphereCollider contactTipCollider;
+    Transform gearCollidersTransform;
+    Collider[] gearColliders = System.Array.Empty<Collider>();
     readonly HashSet<Collider> contactingGearColliders = new HashSet<Collider>();
     readonly HashSet<string> activeContactPairs = new HashSet<string>();
 
@@ -99,14 +102,19 @@ public sealed class DetentPlungerDebug : MonoBehaviour
     {
         initialLocalPosition = transform.localPosition;
         positionSpring = 300000f;
-        positionDamper = 450f;
-        maximumSpringForce = 1000f;
+        positionDamper = 30f;
+        maximumSpringForce = 50f;
     }
 
     void Awake()
     {
         body = GetComponent<Rigidbody>();
         configurableJoint = GetComponent<ConfigurableJoint>();
+        Transform contactTip = transform.Find("ContactTip");
+        contactTipCollider = contactTip ? contactTip.GetComponent<SphereCollider>() : null;
+        GameObject gearRotor = GameObject.Find("GearRotor");
+        gearCollidersTransform = gearRotor ? gearRotor.transform.Find("GearColliders") : null;
+        gearColliders = GetGearColliders();
         if (body)
         {
             body.sleepThreshold = 0f;
@@ -225,6 +233,42 @@ public sealed class DetentPlungerDebug : MonoBehaviour
         contactingColliderPairs = string.Empty;
     }
 
+    public float CalculateToothAlignment01(float approachAngleDegrees, Vector3 rotationAxisWorld)
+    {
+        if (!contactTipCollider || !gearCollidersTransform || approachAngleDegrees <= 0f)
+            return 0f;
+
+        Vector3 gearCenter = gearCollidersTransform.position;
+        Vector3 tipCenter = contactTipCollider.transform.TransformPoint(contactTipCollider.center);
+        Vector3 plungerDirection = Vector3.ProjectOnPlane(
+            tipCenter - gearCenter,
+            rotationAxisWorld).normalized;
+        if (plungerDirection.sqrMagnitude <= Mathf.Epsilon)
+            return 0f;
+
+        float greatestAlignment = 0f;
+        foreach (Collider gearCollider in gearColliders)
+        {
+            if (!gearCollider || !gearCollider.enabled || !gearCollider.gameObject.activeInHierarchy)
+                continue;
+
+            Vector3 toothDirection = Vector3.ProjectOnPlane(
+                gearCollider.bounds.center - gearCenter,
+                rotationAxisWorld).normalized;
+            if (toothDirection.sqrMagnitude <= Mathf.Epsilon)
+                continue;
+
+            float angle = Vector3.Angle(plungerDirection, toothDirection);
+            float linearAlignment = 1f - Mathf.Clamp01(angle / approachAngleDegrees);
+            // Curved response (enable this line to use SmoothStep):
+            // float alignment = Mathf.SmoothStep(0f, 1f, linearAlignment);
+            // Linear response:
+            float alignment = linearAlignment;
+            greatestAlignment = Mathf.Max(greatestAlignment, alignment);
+        }
+
+        return greatestAlignment;
+    }
     static bool IsGearCollider(Collider candidate)
     {
         for (Transform current = candidate.transform; current; current = current.parent)
