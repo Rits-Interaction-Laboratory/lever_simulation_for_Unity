@@ -15,6 +15,8 @@ public sealed class GearRotorMassPropertiesEditor : Editor
         using (new EditorGUI.DisabledScope(true))
         {
             EditorGUILayout.Vector3Field("Center Of Mass (Local)", properties.CalculatedCenterOfMassLocal);
+            EditorGUILayout.Vector3Field("Principal Inertia [kg m^2]", properties.CalculatedPrincipalInertia);
+            EditorGUILayout.Vector3Field("Principal Axes (Local Degrees)", properties.CalculatedInertiaTensorRotation.eulerAngles);
             EditorGUILayout.DoubleField("Total Volume [m^3]", properties.CalculatedVolume);
             EditorGUILayout.IntField("Meshes Used", properties.MeshesUsed);
             EditorGUILayout.TextField("Status", properties.CalculationStatus);
@@ -22,7 +24,7 @@ public sealed class GearRotorMassPropertiesEditor : Editor
 
         if (GUILayout.Button("Recalculate From Visible Meshes"))
         {
-            Undo.RecordObject(properties, "Recalculate GearRotor center of mass");
+            Undo.RecordObject(properties, "Recalculate GearRotor mass properties");
             properties.RecalculateFromVisibleMeshes();
             EditorUtility.SetDirty(properties);
             EditorUtility.SetDirty(properties.GetComponent<Rigidbody>());

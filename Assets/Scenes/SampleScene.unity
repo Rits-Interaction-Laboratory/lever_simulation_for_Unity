@@ -231,7 +231,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DetentPlungerDebug
   enableGearContact: 1
   initialLocalPosition: {x: 0, y: 0, z: 0}
-  positionSpring: 300000
+  positionSpring: 400000
   positionDamper: 30
   maximumSpringForce: 50
   currentCompressionMeters: 0
@@ -1341,9 +1341,9 @@ Rigidbody:
   m_Mass: 0.25
   m_LinearDamping: 0
   m_AngularDamping: 0
-  m_CenterOfMass: {x: 0.09580702, y: 0.17983021, z: 2.9503136}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_CenterOfMass: {x: 0.09581104, y: 0.17983039, z: 2.950404}
+  m_InertiaTensor: {x: 0.0000141260525, y: 0.0035214003, z: 0.0035365399}
+  m_InertiaRotation: {x: -0.004817412, y: 0.0046444014, z: -0.70708907, w: 0.7070929}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -1351,7 +1351,7 @@ Rigidbody:
     serializedVersion: 2
     m_Bits: 0
   m_ImplicitCom: 0
-  m_ImplicitTensor: 1
+  m_ImplicitTensor: 0
   m_UseGravity: 1
   m_IsKinematic: 0
   m_Interpolate: 1
@@ -1369,10 +1369,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 59f85aa350944ff1820d7a62c19783ad, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GearRotorMassProperties
-  calculatedCenterOfMassLocal: {x: 0.09580702, y: 0.17983021, z: 2.9503136}
+  calculatedCenterOfMassLocal: {x: 0.09581104, y: 0.17983039, z: 2.950404}
+  calculatedPrincipalInertia: {x: 0.0000141260525, y: 0.0035214003, z: 0.0035365399}
+  calculatedInertiaTensorRotation: {x: -0.004817412, y: 0.0046444014, z: -0.70708907, w: 0.7070929}
   calculatedVolume: 0.0000822579120683907
   meshesUsed: 2
-  calculationStatus: Uniform-density volume centroid calculated successfully.
+  calculationStatus: Uniform-density centroid and inertia tensor calculated successfully.
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0

@@ -213,10 +213,20 @@ public sealed class LeverRotorTorqueTest : MonoBehaviour
             signedInputTorque = currentAppliedTorque * direction;
         }
 
-        if (signedInputTorque != 0f)
-            body.AddTorque(worldAxis * ToPhysicalSign(signedInputTorque), ForceMode.Force);
+        float scriptedExternalTorque = 0f; // Scripted waveform torque disabled.
+        // float simulationTimeSeconds = Time.fixedTime;
+        // if (simulationTimeSeconds >= 0.5f && simulationTimeSeconds < 14f)
+        // {
+        //     scriptedExternalTorque =
+        //         0.3f * Mathf.Sin(10f * simulationTimeSeconds);
+        // }
 
-        WriteCsvRow(axisSpeed, angularAcceleration, signedInputTorque);
+        float totalInputTorque = signedInputTorque + scriptedExternalTorque;
+        if (totalInputTorque != 0f)
+            body.AddTorque(worldAxis * ToPhysicalSign(totalInputTorque), ForceMode.Force);
+
+        // Keep the existing CSV column name; it now records keyboard + scripted external torque.
+        WriteCsvRow(axisSpeed, angularAcceleration, totalInputTorque);
         previousAxisSpeed = axisSpeed;
 
     }
@@ -315,17 +325,17 @@ public sealed class LeverRotorTorqueTest : MonoBehaviour
         }
     }
 
-    void WriteCsvRow(float axisSpeed, float angularAcceleration, float signedInputTorque)
+    void WriteCsvRow(float axisSpeed, float angularAcceleration, float totalInputTorque)
     {
         if (csvWriter == null)
             return;
 
-        float commandedNetTorque = signedInputTorque + currentResistanceTorque;
+        float commandedNetTorque = totalInputTorque + currentResistanceTorque;
         csvWriter.WriteLine(string.Format(
             CultureInfo.InvariantCulture,
             "{0},{1:R},{2:R},{3:R},{4:R},{5:R},{6:R},{7:R},{8:R},{9:R},{10:R},{11:R},{12:R},{13:R},{14:R},{15:R},{16:R},{17:R},{18:R},{19:R},{20:R},{21:R}",
             sampleIndex++, Time.fixedTime, axisAngleRadians, axisSpeed, angularAcceleration,
-            currentResistanceTorque, signedInputTorque, commandedNetTorque,
+            currentResistanceTorque, totalInputTorque, commandedNetTorque,
             hingeInertiaKgM2, rotationalKineticEnergyJ,
             plungerAxisVelocityMetersPerSecond, plungerKineticEnergyJ,
             gravitationalPotentialEnergyJ, plungerSpringPotentialEnergyJ,

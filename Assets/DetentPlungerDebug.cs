@@ -7,7 +7,7 @@ public sealed class DetentPlungerDebug : MonoBehaviour
     [SerializeField, Tooltip("Enable physical contact between the gear teeth and plunger. Disable to remove contact-generated torque.")]
     bool enableGearContact = true;
     [SerializeField] Vector3 initialLocalPosition;
-    [SerializeField] float positionSpring = 300000f;
+    [SerializeField] float positionSpring = 400000f;
     [SerializeField] float positionDamper = 30f;
     [SerializeField] float maximumSpringForce = 50f;
     [SerializeField, Tooltip("Current downward displacement [m]")]
@@ -101,7 +101,7 @@ public sealed class DetentPlungerDebug : MonoBehaviour
     public void CaptureInitialPosition()
     {
         initialLocalPosition = transform.localPosition;
-        positionSpring = 300000f;
+        positionSpring = 400000f;
         positionDamper = 30f;
         maximumSpringForce = 50f;
     }
