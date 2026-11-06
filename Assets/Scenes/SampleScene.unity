@@ -1265,6 +1265,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d17100bdd6fa8214e8db916ee486688e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LeverRotorTorqueTest
+  replayRecordedInput: 1
+  replayCsvPath: RecordedData/lever_training_20260909_175238.csv
+  plungerContactReactionTorqueNm: 0
   torque: 1
   torqueRampSeconds: 3
   torqueReleaseSeconds: 1
