@@ -231,7 +231,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DetentPlungerDebug
   enableGearContact: 1
   initialLocalPosition: {x: 0, y: 0, z: 0}
-  positionSpring: 400000
+  positionSpring: 700000
   positionDamper: 30
   maximumSpringForce: 50
   currentCompressionMeters: 0
@@ -444,7 +444,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &239700567
 Transform:
   m_ObjectHideFlags: 0
@@ -1178,7 +1178,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &603310992
 Transform:
   m_ObjectHideFlags: 0
@@ -1341,9 +1341,9 @@ Rigidbody:
   m_Mass: 0.25
   m_LinearDamping: 0
   m_AngularDamping: 0
-  m_CenterOfMass: {x: 0.09581104, y: 0.17983039, z: 2.950404}
-  m_InertiaTensor: {x: 0.0000141260525, y: 0.0035214003, z: 0.0035365399}
-  m_InertiaRotation: {x: -0.004817412, y: 0.0046444014, z: -0.70708907, w: 0.7070929}
+  m_CenterOfMass: {x: 0.0958106, y: 0.17406568, z: 2.9503956}
+  m_InertiaTensor: {x: 0.000019905678, y: 0.0036337862, z: 0.0036492408}
+  m_InertiaRotation: {x: -0.0025684978, y: 0.0024572827, z: -0.70710164, w: 0.7071031}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -1369,10 +1369,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 59f85aa350944ff1820d7a62c19783ad, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GearRotorMassProperties
-  calculatedCenterOfMassLocal: {x: 0.09581104, y: 0.17983039, z: 2.950404}
-  calculatedPrincipalInertia: {x: 0.0000141260525, y: 0.0035214003, z: 0.0035365399}
-  calculatedInertiaTensorRotation: {x: -0.004817412, y: 0.0046444014, z: -0.70708907, w: 0.7070929}
-  calculatedVolume: 0.0000822579120683907
+  calculatedCenterOfMassLocal: {x: 0.0958106, y: 0.17406568, z: 2.9503956}
+  calculatedPrincipalInertia: {x: 0.000019905678, y: 0.0036337862, z: 0.0036492408}
+  calculatedInertiaTensorRotation: {x: -0.0025684978, y: 0.0024572827, z: -0.70710164, w: 0.7071031}
+  calculatedVolume: 0.00008509468034504424
   meshesUsed: 2
   calculationStatus: Uniform-density centroid and inertia tensor calculated successfully.
 --- !u!1 &832575517
@@ -2290,7 +2290,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4183874147822290052}
-  m_Mesh: {fileID: -180671217060224588, guid: 7882b451d8e1c0f4fbc17e2a770ed301, type: 3}
+  m_Mesh: {fileID: 8604045607132181640, guid: c51ba8de3e976914b84a933ef14edd8a, type: 3}
 --- !u!1 &2235853664231564907
 GameObject:
   m_ObjectHideFlags: 0

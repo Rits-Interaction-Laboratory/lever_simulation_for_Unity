@@ -12,6 +12,36 @@ public sealed class LeverRotorTorqueTest : MonoBehaviour
 {
     const float PhysicalToLeverSign = -1f;
 
+    bool synchronizedStep;
+    int completedRecordingSamples;
+    double completedRecordingTime;
+    double pendingRecordingTime;
+    float pendingAxisSpeed;
+    public bool RecordingReady => csvWriter != null;
+    public string RecordingFilePath => recordingFilePath;
+    public double RecordingTimeOrigin => (double)Time.fixedDeltaTime;
+    public int CompletedRecordingSamples => completedRecordingSamples;
+    public double CompletedRecordingTime => completedRecordingTime;
+    public double NextRecordingStepTime => sampleIndex * (double)Time.fixedDeltaTime;
+    public float RecordingAngleRadians => GetDirectAxisAngleRadians();
+    public float RecordingPlungerCompression => detentPlunger ? Mathf.Max(0f, detentPlunger.InitialLocalPosition.y - detentPlunger.transform.localPosition.y) : 0f;
+    public void PrepareSynchronizedStep()
+    {
+        synchronizedStep = true;
+        try { FixedUpdate(); }
+        finally { synchronizedStep = false; }
+    }
+    public void CompleteSynchronizedStep() => FlushCompletedPhysicsRow(true);
+    public void FinishRecording() => StopCsvRecording(true, false);
+
+    string pendingCsvRow;
+    double pendingUnityFixedTime;
+    float pendingStepSeconds;
+    float pendingResistanceTorque;
+    double contactAngularImpulse;
+    Vector3 pendingHingeAnchor;
+    Vector3 pendingHingeAxis;
+
     [SerializeField, Min(0f)] float torque = 1f;
     [SerializeField, Min(0.01f), Tooltip("Time to reach maximum input torque [s]")]
     float torqueRampSeconds = 3f;
@@ -93,6 +123,13 @@ public sealed class LeverRotorTorqueTest : MonoBehaviour
 
     void Start()
     {
+#if UNITY_EDITOR
+        if (LeverGameViewRecorder.OwnsPhysicsClock)
+        {
+            angleSetMode = false;
+            recordTrainingData = true;
+        }
+#endif
         CalculateHingeInertia();
         initialLocalRotation = transform.localRotation;
         initialWorldRotation = transform.rotation;
@@ -149,6 +186,10 @@ public sealed class LeverRotorTorqueTest : MonoBehaviour
 
     void FixedUpdate()
     {
+#if UNITY_EDITOR
+        if (LeverGameViewRecorder.OwnsPhysicsClock && !synchronizedStep) return;
+#endif
+        FlushCompletedPhysicsRow();
         if (angleSetMode)
         {
             ApplyTargetAngle();
@@ -312,9 +353,9 @@ public sealed class LeverRotorTorqueTest : MonoBehaviour
             string directory = Path.Combine(Application.persistentDataPath, "RecordedData");
 #endif
             Directory.CreateDirectory(directory);
-            recordingFilePath = Path.Combine(directory, $"lever_training_{DateTime.Now:yyyyMMdd_HHmmss}.csv");
+            recordingFilePath = Path.Combine(directory, $"lever_training_{DateTime.Now:yyyyMMdd_HHmmss_fffffff}.csv");
             csvWriter = new StreamWriter(recordingFilePath, false);
-            csvWriter.WriteLine("sample,time_s,angle_rad,angular_velocity_rad_s,angular_acceleration_rad_s2,friction_torque_nm,input_torque_nm,commanded_net_torque_nm,hinge_inertia_kg_m2,rotational_kinetic_energy_j,plunger_axis_velocity_m_s,plunger_kinetic_energy_j,gravitational_potential_energy_j,plunger_spring_potential_energy_j,total_kinetic_energy_j,total_potential_energy_j,lagrangian_j,plunger_compression_m,gear_center_of_mass_x_m,gear_center_of_mass_y_m,gear_center_of_mass_z_m,angular_momentum_kg_m2_s");
+            csvWriter.WriteLine("sample,time_s,angle_rad,angular_velocity_rad_s,angular_acceleration_rad_s2,friction_torque_nm,input_torque_nm,commanded_net_torque_nm,hinge_inertia_kg_m2,rotational_kinetic_energy_j,plunger_axis_velocity_m_s,plunger_kinetic_energy_j,gravitational_potential_energy_j,plunger_spring_potential_energy_j,total_kinetic_energy_j,total_potential_energy_j,lagrangian_j,plunger_compression_m,gear_center_of_mass_x_m,gear_center_of_mass_y_m,gear_center_of_mass_z_m,angular_momentum_kg_m2_s,plunger_contact_reaction_torque_nm,total_reaction_torque_nm,physics_step_end_time_s,post_step_angle_rad,post_step_plunger_compression_m,post_step_angular_velocity_rad_s,step_angular_acceleration_rad_s2");
             csvWriter.Flush();
             Debug.Log($"Lever training data recording started: {recordingFilePath}", this);
         }
@@ -331,10 +372,10 @@ public sealed class LeverRotorTorqueTest : MonoBehaviour
             return;
 
         float commandedNetTorque = totalInputTorque + currentResistanceTorque;
-        csvWriter.WriteLine(string.Format(
+        pendingCsvRow = string.Format(
             CultureInfo.InvariantCulture,
             "{0},{1:R},{2:R},{3:R},{4:R},{5:R},{6:R},{7:R},{8:R},{9:R},{10:R},{11:R},{12:R},{13:R},{14:R},{15:R},{16:R},{17:R},{18:R},{19:R},{20:R},{21:R}",
-            sampleIndex++, Time.fixedTime, axisAngleRadians, axisSpeed, angularAcceleration,
+            sampleIndex++, synchronizedStep ? (sampleIndex - 1) * (double)Time.fixedDeltaTime : Time.fixedTimeAsDouble, axisAngleRadians, axisSpeed, angularAcceleration,
             currentResistanceTorque, totalInputTorque, commandedNetTorque,
             hingeInertiaKgM2, rotationalKineticEnergyJ,
             plungerAxisVelocityMetersPerSecond, plungerKineticEnergyJ,
@@ -342,7 +383,61 @@ public sealed class LeverRotorTorqueTest : MonoBehaviour
             totalKineticEnergyJ, totalPotentialEnergyJ, lagrangianJ,
             detentPlunger ? Mathf.Max(0f, detentPlunger.InitialLocalPosition.y - detentPlunger.transform.localPosition.y) : 0f,
             body.worldCenterOfMass.x, body.worldCenterOfMass.y, body.worldCenterOfMass.z,
-            angularMomentumKgM2S));
+            angularMomentumKgM2S);
+        pendingRecordingTime = synchronizedStep ? (sampleIndex - 1) * (double)Time.fixedDeltaTime : Time.fixedTimeAsDouble;
+        pendingAxisSpeed = axisSpeed;
+        pendingUnityFixedTime = Time.fixedTimeAsDouble;
+        pendingStepSeconds = Time.fixedDeltaTime;
+        pendingResistanceTorque = currentResistanceTorque;
+        pendingHingeAnchor = transform.TransformPoint(hingeJoint.anchor);
+        pendingHingeAxis = transform.TransformDirection(hingeJoint.axis).normalized;
+        contactAngularImpulse = 0.0;
+    }
+
+    void OnCollisionEnter(Collision collision) => AccumulatePlungerContact(collision);
+    void OnCollisionStay(Collision collision) => AccumulatePlungerContact(collision);
+
+    void AccumulatePlungerContact(Collision collision)
+    {
+        if (pendingCsvRow == null || !plungerBody || !hingeJoint)
+            return;
+        for (int i = 0; i < collision.contactCount; i++)
+        {
+            ContactPoint point = collision.GetContact(i);
+            if (!point.thisCollider || !point.otherCollider)
+                continue;
+            bool gearFirst = point.thisCollider.attachedRigidbody == body &&
+                point.otherCollider.attachedRigidbody == plungerBody;
+            bool gearSecond = point.otherCollider.attachedRigidbody == body &&
+                point.thisCollider.attachedRigidbody == plungerBody;
+            if (!gearFirst && !gearSecond)
+                continue;
+            // Match re-record: orient the impulse onto the receiving gear.
+            Vector3 normalOnGear = gearFirst ? point.normal : -point.normal;
+            Vector3 impulseOnGear = Vector3.Dot(point.impulse, normalOnGear) < 0f
+                ? -point.impulse : point.impulse;
+            contactAngularImpulse += ToLeverSign(Vector3.Dot(pendingHingeAxis,
+                Vector3.Cross(point.point - pendingHingeAnchor, impulseOnGear)));
+        }
+    }
+
+    void FlushCompletedPhysicsRow(bool physicsExplicitlyCompleted = false)
+    {
+        if (pendingCsvRow == null || csvWriter == null)
+            return;
+        // Only write after this step's collision callbacks have completed.
+        // Teardown must not record an unsimulated step as a zero response.
+        if (!physicsExplicitlyCompleted && Time.fixedTimeAsDouble <= pendingUnityFixedTime)
+            return;
+        float reactionTorque = (float)(contactAngularImpulse / pendingStepSeconds);
+        csvWriter.WriteLine(pendingCsvRow + string.Format(CultureInfo.InvariantCulture,
+            ",{0:R},{1:R},{2:R},{3:R},{4:R},{5:R},{6:R}", reactionTorque, pendingResistanceTorque + reactionTorque,
+            pendingRecordingTime + pendingStepSeconds, RecordingAngleRadians, RecordingPlungerCompression,
+            ToLeverSign(Vector3.Dot(body.angularVelocity, transform.TransformDirection(localTorqueAxis).normalized)),
+            (ToLeverSign(Vector3.Dot(body.angularVelocity, transform.TransformDirection(localTorqueAxis).normalized)) - pendingAxisSpeed) / pendingStepSeconds));
+        completedRecordingTime = pendingRecordingTime + pendingStepSeconds;
+        completedRecordingSamples++;
+        pendingCsvRow = null;
 
         if (++rowsSinceFlush >= 50)
         {
@@ -371,6 +466,11 @@ public sealed class LeverRotorTorqueTest : MonoBehaviour
     static float ToLeverSign(float physicalValue) => physicalValue * PhysicalToLeverSign;
     static float ToPhysicalSign(float leverValue) => leverValue * PhysicalToLeverSign;
 
+    void OnDisable()
+    {
+        StopCsvRecording(true, false);
+    }
+
     void OnDestroy()
     {
         StopCsvRecording(true, false);
@@ -380,6 +480,8 @@ public sealed class LeverRotorTorqueTest : MonoBehaviour
     {
         if (csvWriter == null)
             return;
+        FlushCompletedPhysicsRow();
+        pendingCsvRow = null;
         csvWriter.Flush();
         csvWriter.Dispose();
         csvWriter = null;

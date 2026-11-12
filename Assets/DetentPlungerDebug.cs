@@ -166,6 +166,14 @@ public sealed class DetentPlungerDebug : MonoBehaviour
 
     void FixedUpdate()
     {
+#if UNITY_EDITOR
+        if (LeverGameViewRecorder.OwnsPhysicsClock) return;
+#endif
+        AdvancePhysicsStep(Time.fixedTimeAsDouble);
+    }
+
+    public void AdvancePhysicsStep(double stepTime)
+    {
         Vector3 localYInWorld = transform.parent ? transform.parent.up : Vector3.up;
         float compressionBeforeClamp = Mathf.Max(0f, initialLocalPosition.y - transform.localPosition.y);
         float localYSpeed = body ? Vector3.Dot(body.linearVelocity, localYInWorld) : 0f;
