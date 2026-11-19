@@ -9,7 +9,8 @@ using UnityEngine;
 public static class LeverRecordingSmokeCheck
 {
     const string ActiveKey = "LeverRecordingSmokeCheck.Active";
-    static double started;
+    static double started, pauseStarted, pausedSimulation;
+    static bool pauseTested;
     static LeverRecordingSmokeCheck() { EditorApplication.update += Monitor; EditorApplication.delayCall += CheckRequest; }
     static void CheckRequest()
     {
@@ -24,6 +25,7 @@ public static class LeverRecordingSmokeCheck
         EditorApplication.ExecuteMenuItem("Window/General/Game");
         EditorPrefs.SetBool("LeverGameViewRecording." + Application.dataPath, true);
         SessionState.SetBool(ActiveKey, true);
+        pauseTested = false; pauseStarted = 0;
         started = EditorApplication.timeSinceStartup;
         EditorApplication.isPlaying = true;
     }
@@ -35,13 +37,30 @@ public static class LeverRecordingSmokeCheck
         try
         {
             var recorder = LeverGameViewRecordingAutoStart.Current;
-            if (!recorder || recorder.FrameCount < 12)
+            if (recorder && pauseStarted > 0)
+            {
+                if (EditorApplication.timeSinceStartup - pauseStarted < 0.25) return;
+                if (Math.Abs(recorder.SimulationSeconds - pausedSimulation) > 1e-9) throw new Exception("Physics advanced during Editor pause.");
+                pauseStarted = 0;
+                EditorApplication.isPaused = false;
+            }
+            if (recorder && !pauseTested && recorder.SimulationSeconds >= 2.0)
+            {
+                pauseTested = true; pauseStarted = EditorApplication.timeSinceStartup;
+                pausedSimulation = recorder.SimulationSeconds;
+                EditorApplication.isPaused = true;
+                return;
+            }
+            if (!recorder || recorder.FrameCount < 12 || recorder.SimulationSeconds < 15.0)
             {
                 if (EditorApplication.timeSinceStartup - started > 90) throw new Exception("Recording startup timed out.");
                 return;
             }
             var lever = UnityEngine.Object.FindAnyObjectByType<LeverRotorTorqueTest>();
             string csv = lever.RecordingFilePath, video = recorder.OutputPath;
+            double wallSeconds = recorder.WallSeconds, simulationSeconds = recorder.SimulationSeconds;
+            double speedRatio = wallSeconds > 0 ? simulationSeconds / wallSeconds : 0;
+            recorder.SavePreview(Path.ChangeExtension(video, ".preview.png"));
             recorder.Finish();
             var lines = File.ReadAllLines(csv);
             var header = lines[0].Split(',');
@@ -71,7 +90,8 @@ public static class LeverRecordingSmokeCheck
                     Math.Abs(Parse(frame[5]) - Parse(data[sample][angle])) > 1e-6 ||
                     Math.Abs(Parse(frame[1]) - (Parse(frame[2]) - origin)) > 1e-6) throw new Exception("Frame/CSV synchronization mismatch.");
             }
-            File.WriteAllText("Temp/lever-recording-smoke-check.txt", "PASS first_frame_sample=0 video_start=0 frames=" + frames.Length + " samples=" + data.Length + Environment.NewLine + "VIDEO=" + video + Environment.NewLine + "CSV=" + csv);
+            if (!LeverGameViewRecordingAutoStart.HighPrecision && (speedRatio < 0.95 || speedRatio > 1.05)) throw new Exception("Real-time speed mismatch: " + speedRatio.ToString("R", CultureInfo.InvariantCulture));
+            File.WriteAllText("Temp/lever-recording-smoke-check.txt", "PASS pause_resume=true first_frame_sample=0 video_start=0 frames=" + frames.Length + " samples=" + data.Length + " wall_s=" + wallSeconds.ToString("R", CultureInfo.InvariantCulture) + " simulation_s=" + simulationSeconds.ToString("R", CultureInfo.InvariantCulture) + " speed_ratio=" + speedRatio.ToString("R", CultureInfo.InvariantCulture) + Environment.NewLine + "VIDEO=" + video + Environment.NewLine + "CSV=" + csv);
             Debug.Log("Synchronized recording verification passed: " + video);
             SessionState.SetBool(ActiveKey, false);
             EditorApplication.isPlaying = false;

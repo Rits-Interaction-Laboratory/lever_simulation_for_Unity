@@ -7,9 +7,11 @@ public sealed class DetentPlungerDebug : MonoBehaviour
     [SerializeField, Tooltip("Enable physical contact between the gear teeth and plunger. Disable to remove contact-generated torque.")]
     bool enableGearContact = true;
     [SerializeField] Vector3 initialLocalPosition;
-    [SerializeField] float positionSpring = 400000f;
-    [SerializeField] float positionDamper = 30f;
+    [SerializeField] float positionSpring = 5000f;
+    [SerializeField] float positionDamper = 60f;
     [SerializeField] float maximumSpringForce = 50f;
+    [SerializeField, Min(0f), Tooltip("Extra upward spring travel from the authored start pose [m]. Maintains preload at cam valleys.")] float springFollowTravel = 0.008f;
+    [SerializeField, Min(0.000001f)] float camContactOffset = 0.00002f;
     [SerializeField, Tooltip("Current downward displacement [m]")]
     float currentCompressionMeters;
     [SerializeField, Tooltip("Position Spring x compression [N]")]
@@ -41,6 +43,7 @@ public sealed class DetentPlungerDebug : MonoBehaviour
     SphereCollider contactTipCollider;
     Transform gearCollidersTransform;
     Collider[] gearColliders = System.Array.Empty<Collider>();
+    Vector3[] gearColliderLocalDirections;
     readonly HashSet<Collider> contactingGearColliders = new HashSet<Collider>();
     readonly HashSet<string> activeContactPairs = new HashSet<string>();
 
@@ -100,9 +103,9 @@ public sealed class DetentPlungerDebug : MonoBehaviour
 
     public void CaptureInitialPosition()
     {
-        initialLocalPosition = transform.localPosition;
-        positionSpring = 400000f;
-        positionDamper = 30f;
+        initialLocalPosition = transform.localPosition + Vector3.up * springFollowTravel;
+        positionSpring = 5000f;
+        positionDamper = 60f;
         maximumSpringForce = 50f;
     }
 
@@ -120,10 +123,16 @@ public sealed class DetentPlungerDebug : MonoBehaviour
             body.sleepThreshold = 0f;
             body.WakeUp();
         }
+        ConfigureCamContact();
+        if (gearCollidersTransform && contactTipCollider)
+        {
+            var smooth = gearCollidersTransform.GetComponent<LeverCamSmoothContact>();
+            if (smooth && smooth.enabled) smooth.Configure(gearCollidersTransform, contactTipCollider);
+        }
         IgnoreBodyColliderAgainstGearTeeth();
         SetGearCollidersEnabled(enableGearContact);
-        // The position at the moment Play starts is always the spring's rest position.
-        initialLocalPosition = transform.localPosition;
+        // The spring rest position includes upward travel so the tip can follow cam valleys.
+        initialLocalPosition = transform.localPosition + Vector3.up * springFollowTravel;
 
         if (configurableJoint)
         {
@@ -134,6 +143,33 @@ public sealed class DetentPlungerDebug : MonoBehaviour
                 maximumForce = 0f
             };
             initialJointAnchorSeparationY = CalculateJointAnchorSeparationY();
+        }
+    }
+
+    void ConfigureCamContact()
+    {
+        foreach (Collider c in gearColliders)
+            if (c) c.contactOffset = camContactOffset;
+        if (contactTipCollider) contactTipCollider.contactOffset = camContactOffset;
+        if (body)
+        {
+            body.solverIterations = 20;
+            body.solverVelocityIterations = 10;
+        }
+        if (configurableJoint)
+        {
+            var limit = configurableJoint.linearLimit;
+            limit.limit = Mathf.Max(limit.limit, springFollowTravel + 0.005f);
+            limit.contactDistance = camContactOffset;
+            configurableJoint.linearLimit = limit;
+        }
+        var rotor = GameObject.Find("GearRotor");
+        var rotorBody = rotor ? rotor.GetComponent<Rigidbody>() : null;
+        if (rotorBody)
+        {
+            rotorBody.solverIterations = 20;
+            rotorBody.solverVelocityIterations = 10;
+            rotorBody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
         }
     }
 
@@ -206,14 +242,20 @@ public sealed class DetentPlungerDebug : MonoBehaviour
             ? Vector3.Dot(body.linearVelocity, localYInWorld)
             : 0f;
         contactingGearColliderCount = contactingGearColliders.Count;
-        UpdateContactingGearColliderNames();
-        UpdateContactingColliderPairs();
+
 
         jointAnchorSeparationY = CalculateJointAnchorSeparationY();
         jointYDisplacementFromPlayStart = jointAnchorSeparationY - initialJointAnchorSeparationY;
         jointYDriveError = configurableJoint
             ? jointAnchorSeparationY - configurableJoint.targetPosition.y
             : 0f;
+    }
+
+    // Build Inspector strings once per rendered frame, rather than 2000 times per second.
+    void LateUpdate()
+    {
+        UpdateContactingGearColliderNames();
+        UpdateContactingColliderPairs();
     }
 
     void OnCollisionEnter(Collision collision)
@@ -254,28 +296,30 @@ public sealed class DetentPlungerDebug : MonoBehaviour
         if (plungerDirection.sqrMagnitude <= Mathf.Epsilon)
             return 0f;
 
-        float greatestAlignment = 0f;
-        foreach (Collider gearCollider in gearColliders)
+        if (gearColliderLocalDirections == null || gearColliderLocalDirections.Length != gearColliders.Length)
         {
-            if (!gearCollider || !gearCollider.enabled || !gearCollider.gameObject.activeInHierarchy)
-                continue;
-
-            Vector3 toothDirection = Vector3.ProjectOnPlane(
-                gearCollider.bounds.center - gearCenter,
-                rotationAxisWorld).normalized;
-            if (toothDirection.sqrMagnitude <= Mathf.Epsilon)
-                continue;
-
-            float angle = Vector3.Angle(plungerDirection, toothDirection);
-            float linearAlignment = 1f - Mathf.Clamp01(angle / approachAngleDegrees);
-            // Curved response (enable this line to use SmoothStep):
-            // float alignment = Mathf.SmoothStep(0f, 1f, linearAlignment);
-            // Linear response:
-            float alignment = linearAlignment;
-            greatestAlignment = Mathf.Max(greatestAlignment, alignment);
+            gearColliderLocalDirections = new Vector3[gearColliders.Length];
+            for (int i = 0; i < gearColliders.Length; i++)
+                if (gearColliders[i])
+                    gearColliderLocalDirections[i] = gearCollidersTransform.InverseTransformDirection(
+                        gearColliders[i].bounds.center - gearCenter);
         }
-
-        return greatestAlignment;
+        Vector3 localAxis = gearCollidersTransform.InverseTransformDirection(rotationAxisWorld).normalized;
+        Vector3 localDirection = gearCollidersTransform.InverseTransformDirection(plungerDirection);
+        float greatestDot = -1f;
+        bool found = false;
+        for (int i = 0; i < gearColliders.Length; i++)
+        {
+            var collider = gearColliders[i];
+            if (!collider || !collider.enabled || !collider.gameObject.activeInHierarchy) continue;
+            Vector3 direction = Vector3.ProjectOnPlane(gearColliderLocalDirections[i], localAxis).normalized;
+            if (direction.sqrMagnitude <= Mathf.Epsilon) continue;
+            greatestDot = Mathf.Max(greatestDot, Vector3.Dot(localDirection, direction));
+            found = true;
+        }
+        return found
+            ? 1f - Mathf.Clamp01(Mathf.Acos(Mathf.Clamp(greatestDot, -1f, 1f)) * Mathf.Rad2Deg / approachAngleDegrees)
+            : 0f;
     }
     static bool IsGearCollider(Collider candidate)
     {

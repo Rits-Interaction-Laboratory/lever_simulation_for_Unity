@@ -354,7 +354,7 @@ public sealed class LeverRotorTorqueTest : MonoBehaviour
 #endif
             Directory.CreateDirectory(directory);
             recordingFilePath = Path.Combine(directory, $"lever_training_{DateTime.Now:yyyyMMdd_HHmmss_fffffff}.csv");
-            csvWriter = new StreamWriter(recordingFilePath, false);
+            csvWriter = new StreamWriter(recordingFilePath, false, new System.Text.UTF8Encoding(false), 65536);
             csvWriter.WriteLine("sample,time_s,angle_rad,angular_velocity_rad_s,angular_acceleration_rad_s2,friction_torque_nm,input_torque_nm,commanded_net_torque_nm,hinge_inertia_kg_m2,rotational_kinetic_energy_j,plunger_axis_velocity_m_s,plunger_kinetic_energy_j,gravitational_potential_energy_j,plunger_spring_potential_energy_j,total_kinetic_energy_j,total_potential_energy_j,lagrangian_j,plunger_compression_m,gear_center_of_mass_x_m,gear_center_of_mass_y_m,gear_center_of_mass_z_m,angular_momentum_kg_m2_s,plunger_contact_reaction_torque_nm,total_reaction_torque_nm,physics_step_end_time_s,post_step_angle_rad,post_step_plunger_compression_m,post_step_angular_velocity_rad_s,step_angular_acceleration_rad_s2");
             csvWriter.Flush();
             Debug.Log($"Lever training data recording started: {recordingFilePath}", this);
@@ -439,7 +439,7 @@ public sealed class LeverRotorTorqueTest : MonoBehaviour
         completedRecordingSamples++;
         pendingCsvRow = null;
 
-        if (++rowsSinceFlush >= 50)
+        if (++rowsSinceFlush >= 500)
         {
             csvWriter.Flush();
             rowsSinceFlush = 0;

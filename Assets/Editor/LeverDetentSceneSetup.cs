@@ -322,6 +322,9 @@ internal static class LeverDetentSceneSetup
             EditorUtility.SetDirty(sphere);
         }
 
+        // Use the actual cam outline when this model replaces the original gear.
+        if (LeverCamColliderSetup.Ensure(rotor)) return;
+
         // Put a valley at the plunger in the rest pose. Teeth arrive progressively as the rotor turns.
         const int toothCount = 12;
         const float toothRadius = 0.003f;
